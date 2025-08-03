@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import javax.inject.Inject
+import kotlin.math.abs
 
 @HiltViewModel
 class ResultsViewModel @Inject constructor(
@@ -54,7 +55,7 @@ class ResultsViewModel @Inject constructor(
                     onSuccess = { detectedObjects ->
                         Log.d("ResultsViewModel", "Detection successful: ${detectedObjects.size} objects detected before processing.")
 
-                        // --- CAMBIO CLAVE: Llamar a la función de mapeo ---
+                        // --- CAMBIO CLAVE: Llamar a la función de mapeo mejorada ---
                         val (processedDetections, totalAmount) = mapDetectionsToValues(detectedObjects)
 
                         Log.d("ResultsViewModel", "Processing complete. Total amount: $$totalAmount")
@@ -92,8 +93,9 @@ class ResultsViewModel @Inject constructor(
         }
     }
 
-    // --- FUNCIÓN HELPER REFACTORIZADA ---
-    // Ahora toma una lista y devuelve la lista procesada y el total.
+    /**
+     * FUNCIÓN MEJORADA: Mapea detecciones a valores con lógica corregida
+     */
     private fun mapDetectionsToValues(detections: List<DetectedObject>): Pair<List<DetectedObject>, Double> {
         if (detections.isEmpty()) {
             return Pair(emptyList(), 0.0)
@@ -102,32 +104,94 @@ class ResultsViewModel @Inject constructor(
         var total = 0.0
         val processedDetections = detections.map { detection ->
             val detectedValue = when (detection.label) {
+                // Billetes - valores fijos
                 "billete_20" -> 20.0
                 "billete_50" -> 50.0
                 "billete_100" -> 100.0
                 "billete_200" -> 200.0
                 "billete_500" -> 500.0
                 "billete_1000" -> 1000.0
+
+                // Monedas con denominación específica - valores fijos
                 "moneda_0_50" -> 0.5
                 "moneda_10" -> 10.0
-                "moneda_2_anverso" -> 2.0 // Asumiendo que esta es la etiqueta correcta de tu modelo
-                "moneda_5_anverso" -> 5.0 // Asumiendo que esta es la etiqueta correcta de tu modelo
-                "moneda_1_anverso", "moneda_reverso_comun" -> {
-                    // Esta lógica basada en el tamaño puede ser frágil, pero la mantengo
-                    when {
-                        detection.boundingBox.width() < 150 -> 1.0
-                        detection.boundingBox.width() < 180 -> 2.0
-                        else -> 5.0
+                "moneda_1_anverso" -> 1.0  // CORREGIDO: siempre 1 peso
+                "moneda_2_anverso" -> 2.0  // CORREGIDO: siempre 2 pesos
+                "moneda_5_anverso" -> 5.0  // CORREGIDO: siempre 5 pesos
+
+                // Moneda reverso común - requiere comparación con anversos
+                "moneda_reverso_comun" -> {
+                    Log.d("ResultsViewModel", "Determinando valor para moneda_reverso_comun")
+                    determineReverseValue(detection, detections)
+                }
+
+                // Manejo de clasificaciones inciertas
+                "moneda_comun_reverso" -> {
+                    Log.d("ResultsViewModel", "Detectada moneda_comun_reverso, aplicando lógica de comparación")
+                    determineReverseValue(detection, detections)
+                }
+
+                // Clasificaciones inciertas (del sistema de reintento)
+                else -> {
+                    if (detection.label.startsWith("incierto_")) {
+                        Log.w("ResultsViewModel", "Clasificación incierta: ${detection.label}")
+                        0.0 // No sumar valor incierto al total
+                    } else {
+                        Log.w("ResultsViewModel", "Etiqueta no reconocida: ${detection.label}")
+                        0.0 // Valor por defecto si la etiqueta no se reconoce
                     }
                 }
-                else -> 0.0 // Valor por defecto si la etiqueta no se reconoce
             }
+
             total += detectedValue
+            Log.d("ResultsViewModel", "Asignado valor $detectedValue a ${detection.label}")
+
             // Creamos una nueva instancia de DetectedObject con el valor actualizado
             detection.copy(value = detectedValue)
         }
 
         return Pair(processedDetections, total)
+    }
+
+    /**
+     * NUEVA FUNCIÓN: Determina el valor de una moneda reverso común
+     * comparando su tamaño con monedas anverso detectadas en la misma imagen
+     */
+    private fun determineReverseValue(
+        reverseDetection: DetectedObject,
+        allDetections: List<DetectedObject>
+    ): Double {
+        // Buscar monedas anverso detectadas en la misma imagen
+        val anversoCoins = allDetections.filter {
+            it.label.contains("_anverso") && it.label.startsWith("moneda_")
+        }
+
+        if (anversoCoins.isEmpty()) {
+            Log.d("ResultsViewModel", "No hay monedas anverso para comparar, asignando valor por defecto: 1.0")
+            return 1.0 // Si no hay referencias, usar valor más común
+        }
+
+        // Calcular área de la moneda reverso
+        val reverseArea = reverseDetection.boundingBox.width() * reverseDetection.boundingBox.height()
+        Log.d("ResultsViewModel", "Área de moneda reverso: $reverseArea")
+
+        // Encontrar la moneda anverso más cercana en tamaño
+        val closestCoin = anversoCoins.minByOrNull { anversoCoin ->
+            val anversoArea = anversoCoin.boundingBox.width() * anversoCoin.boundingBox.height()
+            val difference = abs(reverseArea - anversoArea)
+            Log.d("ResultsViewModel", "Comparando con ${anversoCoin.label}, área: $anversoArea, diferencia: $difference")
+            difference
+        }
+
+        val assignedValue = when (closestCoin?.label) {
+            "moneda_1_anverso" -> 1.0
+            "moneda_2_anverso" -> 2.0
+            "moneda_5_anverso" -> 5.0
+            else -> 1.0 // Valor por defecto
+        }
+
+        Log.d("ResultsViewModel", "Moneda reverso asignada valor $assignedValue basado en ${closestCoin?.label}")
+        return assignedValue
     }
 
     private fun loadBitmapFromUri(uri: Uri): Bitmap {
@@ -214,6 +278,4 @@ class ResultsViewModel @Inject constructor(
             bitmap
         }
     }
-
-    // La función original processDetectionsAndUpdateState ya no es necesaria y puede ser eliminada.
 }

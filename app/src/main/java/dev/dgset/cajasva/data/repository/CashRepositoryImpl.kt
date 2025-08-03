@@ -35,7 +35,7 @@ class CashRepositoryImpl @Inject constructor(
                     box.height().toInt()
                 )
 
-                val (label, confidence) = classifier.classify(croppedBitmap)
+                val (label, confidence) = classifier.classifyWithRetry(croppedBitmap, minConfidence = 0.85f)
 
                 finalObjects.add(
                     DetectedObject(
