@@ -1,0 +1,12 @@
+billete_100
+billete_1000
+billete_20
+billete_200
+billete_50
+billete_500
+moneda_0_50
+moneda_10
+moneda_1_anverso
+moneda_2_anverso
+moneda_5_anverso
+moneda_reverso_comun
