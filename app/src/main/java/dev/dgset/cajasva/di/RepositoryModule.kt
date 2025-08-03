@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.dgset.cajasva.data.local.ml.MoneyClassifier
+import dev.dgset.cajasva.data.local.ml.MoneyDetector
 import dev.dgset.cajasva.data.local.ml.ObjectDetector
 import dev.dgset.cajasva.data.repository.CashRepositoryImpl
 import dev.dgset.cajasva.domain.repository.CashRepository
@@ -43,6 +44,20 @@ abstract class RepositoryModule {
                 context = context,
                 modelPath = "classifier_model_float32.tflite",
                 labelPath = "classifier_labels.txt"
+            )
+        }
+
+        @Provides
+        @Singleton
+        fun provideMoneyDetector(
+            @ApplicationContext context: Context,
+            objectDetector: ObjectDetector,
+            moneyClassifier: MoneyClassifier
+        ): MoneyDetector {
+            return MoneyDetector(
+                context = context,
+                objectDetector = objectDetector,
+                moneyClassifier = moneyClassifier
             )
         }
     }

@@ -268,14 +268,26 @@ fun ScanningContent(
                             // Instrucciones en la parte superior
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                                    containerColor = if (uiState.error != null) 
+                                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                                    else 
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                                 )
                             ) {
-                                Text(
-                                    text = "Toca para enfocar • Coloca billetes y monedas visibles",
-                                    modifier = Modifier.padding(12.dp),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    if (uiState.error != null) {
+                                        Text(
+                                            text = "⚠️ ${uiState.error}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "Toca para enfocar • Coloca billetes y monedas visibles",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
@@ -327,30 +339,44 @@ fun ScanningContent(
                         // Botón de captura
                         Button(
                             onClick = onTakePicture,
-                            enabled = !uiState.isTakingPicture,
+                            enabled = !uiState.isTakingPicture && !uiState.isProcessingImage,
                             modifier = Modifier.size(80.dp),
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White)
                         ) {
-                            if (uiState.isTakingPicture) {
-                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                            } else {
-                                Text("📸", fontSize = 32.sp)
+                            when {
+                                uiState.isTakingPicture -> CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                                uiState.isProcessingImage -> CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                                else -> Text("📸", fontSize = 32.sp)
                             }
                         }
 
-                        // Indicador de estado del flash
+                        // Indicador de estado
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = if (isFlashEnabled.value) "Flash ON" else "Flash OFF",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isFlashEnabled.value)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface
-                            )
+                            when {
+                                uiState.isProcessingImage -> Text(
+                                    text = "Procesando...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                uiState.isTakingPicture -> Text(
+                                    text = "Capturando...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                isFlashEnabled.value -> Text(
+                                    text = "Flash ON",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                else -> Text(
+                                    text = "Flash OFF",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }
