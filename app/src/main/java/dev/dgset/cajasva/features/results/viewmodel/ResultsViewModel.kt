@@ -33,6 +33,50 @@ class ResultsViewModel @Inject constructor(
 
     fun processImageUri(imageUri: Uri) {
         Log.d("ResultsViewModel", "Processing image URI: $imageUri")
+        
+        // First check if we have pre-processed data from ScanningViewModel
+        val (preProcessedResults, preProcessedTotal) = dev.dgset.cajasva.features.scanning.viewmodel.ScanningViewModel.getLastProcessedData()
+        
+        if (preProcessedResults != null) {
+            Log.d("ResultsViewModel", "Using pre-processed data: ${preProcessedResults.size} objects, total: $$preProcessedTotal")
+            
+            // Load bitmap for UI display purposes only
+            viewModelScope.launch {
+                try {
+                    val bitmap = withContext(Dispatchers.IO) { loadBitmapFromUri(imageUri) }
+                    val originalWidth = bitmap.width
+                    val originalHeight = bitmap.height
+                    val aspectRatio = if (originalHeight > 0) originalWidth.toFloat() / originalHeight.toFloat() else 1f
+                    
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false,
+                            breakdown = preProcessedResults,
+                            totalAmount = preProcessedTotal,
+                            originalImageWidth = originalWidth,
+                            originalImageHeight = originalHeight,
+                            imageAspectRatio = aspectRatio,
+                            error = null
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("ResultsViewModel", "Error loading image for display: ${e.message}", e)
+                    // Still use processed data even if image loading fails
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            breakdown = preProcessedResults,
+                            totalAmount = preProcessedTotal,
+                            error = null
+                        )
+                    }
+                }
+            }
+            return
+        }
+        
+        // Fallback to original processing flow for compatibility
+        Log.d("ResultsViewModel", "No pre-processed data found, using original flow")
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {

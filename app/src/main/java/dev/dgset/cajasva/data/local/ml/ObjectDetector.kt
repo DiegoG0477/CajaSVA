@@ -26,9 +26,12 @@ class ObjectDetector(
 ) {
     private val TAG = "ObjectDetector"
     private var interpreter: Interpreter? = null
-    private val INPUT_SIZE = 640
     private lateinit var labels: List<String>
     private val labelsPath = "detector_labels.txt"
+
+    companion object {
+        const val INPUT_SIZE = 640
+    }
 
     init {
         setupDetector()
